@@ -1,0 +1,16 @@
+{
+  "name": "ai-sales-assistant",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace @ai-sales-assistant/api\" \"npm run dev --workspace @ai-sales-assistant/web\"",
+    "build": "npm run build --workspace @ai-sales-assistant/api && npm run build --workspace @ai-sales-assistant/web",
+    "typecheck": "npm run typecheck --workspace @ai-sales-assistant/api && npm run typecheck --workspace @ai-sales-assistant/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
