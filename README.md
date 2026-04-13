@@ -19,14 +19,16 @@ ai-sales-assistant/
 ## Local development
 
 1. Run `npm install`
-2. Run `npm run dev`
-3. Open `http://localhost:5173`
+2. Copy `backend/.env.example` to `backend/.env`
+3. Add your `OPENAI_API_KEY`
+4. Run `npm run dev`
+5. Open `http://localhost:5173`
 
-The app currently uses a mock prospect generator so the full flow is demoable before wiring in OpenAI.
+The backend now calls OpenAI directly and returns structured JSON to the frontend, so the UI keeps the same API contract while the generated content becomes genuinely model-backed.
 
 ## Suggested next steps
 
-1. Replace the mock generator with an LLM-backed research + drafting pipeline
-2. Add schema validation, prompt versioning, and request logging
-3. Persist recent generations so the demo has a history view
-4. Add a company enrichment source for stronger summaries
+1. Add a lightweight research/enrichment step before drafting so the outputs feel more company-specific
+2. Add request logging, prompt versioning, and response persistence for stronger product storytelling
+3. Introduce loading states and artifact copy buttons in the UI
+4. Add evaluation examples so you can talk about prompt quality and iteration during interviews

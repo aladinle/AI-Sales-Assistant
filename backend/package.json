@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.21.0"
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "openai": "^5.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -20,4 +22,3 @@
     "typescript": "^5.0.0"
   }
 }
-

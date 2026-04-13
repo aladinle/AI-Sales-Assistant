@@ -1,3 +1,5 @@
+import OpenAI from "openai";
+
 export type Prospect = {
   companyName: string;
   summary: string;
@@ -5,107 +7,121 @@ export type Prospect = {
   coldCallScript: string;
 };
 
-type ProspectSignal = {
-  sector: string;
-  painPoint: string;
-  valueAngle: string;
-};
+type ProspectPayload = Omit<Prospect, "companyName">;
 
-const signalLibrary: Array<{ keyword: string; signal: ProspectSignal }> = [
-  {
-    keyword: "health",
-    signal: {
-      sector: "healthcare",
-      painPoint: "slow handoffs across revenue, operations, and customer success",
-      valueAngle: "give reps faster context and more consistent messaging"
-    }
-  },
-  {
-    keyword: "fin",
-    signal: {
-      sector: "financial services",
-      painPoint: "high-friction outreach where trust and precision matter",
-      valueAngle: "help reps personalize outreach without slowing down"
-    }
-  },
-  {
-    keyword: "data",
-    signal: {
-      sector: "data infrastructure",
-      painPoint: "complex technical positioning that is hard for reps to translate quickly",
-      valueAngle: "turn product context into buyer-ready language"
-    }
-  },
-  {
-    keyword: "cloud",
-    signal: {
-      sector: "cloud software",
-      painPoint: "crowded categories where generic outreach gets ignored",
-      valueAngle: "produce sharper account-specific messaging at scale"
-    }
-  },
-  {
-    keyword: "logistics",
-    signal: {
-      sector: "logistics",
-      painPoint: "disconnected operational workflows and delayed follow-up",
-      valueAngle: "reduce time between research, outreach, and next step"
+const prospectSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["summary", "outreachEmail", "coldCallScript"],
+  properties: {
+    summary: {
+      type: "string",
+      description:
+        "A short 3-4 sentence prospect summary with likely context, pain points, and a sales angle."
+    },
+    outreachEmail: {
+      type: "string",
+      description:
+        "A concise cold outreach email with a subject line, greeting, body, and sign-off."
+    },
+    coldCallScript: {
+      type: "string",
+      description:
+        "A short cold call script with an opener, value proposition, qualifying question, and close."
     }
   }
-];
+} as const;
 
-const defaultSignal: ProspectSignal = {
-  sector: "B2B software",
-  painPoint: "reps losing time when they move from account research into outbound execution",
-  valueAngle: "compress research, messaging, and call prep into a single workflow"
-};
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
 
-function inferSignal(companyName: string): ProspectSignal {
-  const normalizedName = companyName.toLowerCase();
+  if (!apiKey) {
+    throw new Error(
+      "OPENAI_API_KEY is not set. Add it to backend/.env before generating prospect materials."
+    );
+  }
+
+  return new OpenAI({ apiKey });
+}
+
+function getOpenAIModel() {
+  return process.env.OPENAI_MODEL?.trim() || "gpt-5.4-mini";
+}
+
+function isProspectPayload(value: unknown): value is ProspectPayload {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
 
   return (
-    signalLibrary.find(({ keyword }) => normalizedName.includes(keyword))?.signal ??
-    defaultSignal
+    typeof candidate.summary === "string" &&
+    typeof candidate.outreachEmail === "string" &&
+    typeof candidate.coldCallScript === "string"
   );
 }
 
 export async function buildProspectResponse(companyName: string): Promise<Prospect> {
-  const signal = inferSignal(companyName);
+  const client = getOpenAIClient();
 
-  const summary = `${companyName} appears to be operating in ${signal.sector}, where teams often care about speed, clarity, and consistent buyer communication. A strong outbound angle is that sales reps likely face ${signal.painPoint}, so an AI assistant can ${signal.valueAngle}.`;
+  const response = await client.responses.create({
+    model: getOpenAIModel(),
+    input: [
+      {
+        role: "system",
+        content: [
+          {
+            type: "input_text",
+            text: [
+              "You are an AI sales assistant for an interview demo.",
+              "Generate practical outbound materials for a sales rep targeting a company.",
+              "Be useful, concise, and credible.",
+              "Do not invent precise metrics, recent news, named executives, or specific product facts unless they are obvious from the company name alone.",
+              "If context is uncertain, write with calibrated language such as likely, may, appears to, or probably.",
+              "The summary should be 3-4 sentences.",
+              "The email should be concise and polished.",
+              "The call script should sound natural and short enough for a real opening conversation."
+            ].join(" ")
+          }
+        ]
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: `Company name: ${companyName}`
+          }
+        ]
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "prospect_assets",
+        strict: true,
+        schema: prospectSchema
+      }
+    }
+  });
 
-  const outreachEmail = [
-    `Subject: Helping ${companyName} turn account research into faster outbound`,
-    "",
-    `Hi there,`,
-    "",
-    `I took a look at ${companyName} and one theme stood out: teams in ${signal.sector} usually need reps to move quickly without sending generic messaging.`,
-    "",
-    `We built an AI sales assistant that turns a target account into a short prospect summary, a polished outreach email, and a cold call script in one step. The goal is simple: reduce prep time while improving message consistency.`,
-    "",
-    `If ${signal.painPoint} is relevant for your team, I’d love to show you a quick demo.`,
-    "",
-    `Best,`,
-    `Your Name`
-  ].join("\n");
+  const payloadText = response.output_text;
 
-  const coldCallScript = [
-    `Hi, this is Your Name.`,
-    "",
-    `I’m reaching out because teams like ${companyName} often have to balance fast outreach with thoughtful messaging, especially in ${signal.sector}.`,
-    "",
-    `We built a lightweight AI assistant that helps reps go from company research to a usable email and call plan in minutes instead of stitching it together manually.`,
-    "",
-    `I was curious whether your team is exploring ways to improve outbound consistency or reduce rep prep time.`,
-    "",
-    `If that’s relevant, I’d be happy to show a two-minute example.`
-  ].join("\n");
+  if (!payloadText) {
+    throw new Error("OpenAI returned an empty response.");
+  }
+
+  const payload = JSON.parse(payloadText) as unknown;
+
+  if (!isProspectPayload(payload)) {
+    throw new Error("OpenAI returned an invalid prospect payload.");
+  }
 
   return {
     companyName,
-    summary,
-    outreachEmail,
-    coldCallScript
+    summary: payload.summary,
+    outreachEmail: payload.outreachEmail,
+    coldCallScript: payload.coldCallScript
   };
 }
-
