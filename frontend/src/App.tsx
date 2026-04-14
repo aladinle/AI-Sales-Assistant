@@ -44,7 +44,7 @@ export default function App() {
     <main className="page-shell">
       <section className="hero-panel">
         <div className="hero-copy">
-          <p className="eyebrow">Project 1 · AI Sales Assistant</p>
+          <p className="eyebrow">AI Sales Assistant</p>
           <h1>Turn a company name into a demo-ready outbound package.</h1>
           <p className="lede">
             This prototype shows the product loop clearly: lightweight company input, fast AI value,

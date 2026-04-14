@@ -1,3 +1,5 @@
+import { performance } from "node:perf_hooks";
+
 import OpenAI from "openai";
 
 export type Prospect = {
@@ -64,64 +66,81 @@ function isProspectPayload(value: unknown): value is ProspectPayload {
 
 export async function buildProspectResponse(companyName: string): Promise<Prospect> {
   const client = getOpenAIClient();
+  const model = getOpenAIModel();
+  const openAIStartedAt = performance.now();
 
-  const response = await client.responses.create({
-    model: getOpenAIModel(),
-    input: [
-      {
-        role: "system",
-        content: [
-          {
-            type: "input_text",
-            text: [
-              "You are an AI sales assistant for an interview demo.",
-              "Generate practical outbound materials for a sales rep targeting a company.",
-              "Be useful, concise, and credible.",
-              "Do not invent precise metrics, recent news, named executives, or specific product facts unless they are obvious from the company name alone.",
-              "If context is uncertain, write with calibrated language such as likely, may, appears to, or probably.",
-              "The summary should be 3-4 sentences.",
-              "The email should be concise and polished.",
-              "The call script should sound natural and short enough for a real opening conversation."
-            ].join(" ")
+  try {
+    const response = await client.responses.create({
+      model,
+      input: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: [
+                "You are an AI sales assistant for an interview demo.",
+                "Generate practical outbound materials for a sales rep targeting a company.",
+                "Be useful, concise, and credible.",
+                "Do not invent precise metrics, recent news, named executives, or specific product facts unless they are obvious from the company name alone.",
+                "If context is uncertain, write with calibrated language such as likely, may, appears to, or probably.",
+                "The summary should be 3-4 sentences.",
+                "The email should be concise and polished.",
+                "The call script should sound natural and short enough for a real opening conversation."
+              ].join(" ")
+            }
+          ]
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: `Company name: ${companyName}`
+            }
+          ]
+        }
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "prospect_assets",
+          strict: true,
+          schema: prospectSchema
           }
-        ]
-      },
-      {
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: `Company name: ${companyName}`
-          }
-        ]
       }
-    ],
-    text: {
-      format: {
-        type: "json_schema",
-        name: "prospect_assets",
-        strict: true,
-        schema: prospectSchema
-      }
+    });
+
+    console.info(
+      `[timing] openai.responses.create company="${companyName}" model="${model}" responseId="${response.id}" durationMs=${Math.round(
+        performance.now() - openAIStartedAt
+      )}`
+    );
+
+    const payloadText = response.output_text;
+
+    if (!payloadText) {
+      throw new Error("OpenAI returned an empty response.");
     }
-  });
 
-  const payloadText = response.output_text;
+    const payload = JSON.parse(payloadText) as unknown;
 
-  if (!payloadText) {
-    throw new Error("OpenAI returned an empty response.");
+    if (!isProspectPayload(payload)) {
+      throw new Error("OpenAI returned an invalid prospect payload.");
+    }
+
+    return {
+      companyName,
+      summary: payload.summary,
+      outreachEmail: payload.outreachEmail,
+      coldCallScript: payload.coldCallScript
+    };
+  } catch (error) {
+    console.info(
+      `[timing] openai.responses.create company="${companyName}" model="${model}" durationMs=${Math.round(
+        performance.now() - openAIStartedAt
+      )} status=error`
+    );
+    throw error;
   }
-
-  const payload = JSON.parse(payloadText) as unknown;
-
-  if (!isProspectPayload(payload)) {
-    throw new Error("OpenAI returned an invalid prospect payload.");
-  }
-
-  return {
-    companyName,
-    summary: payload.summary,
-    outreachEmail: payload.outreachEmail,
-    coldCallScript: payload.coldCallScript
-  };
 }
