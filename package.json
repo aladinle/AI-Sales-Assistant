@@ -7,8 +7,12 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace @ai-sales-assistant/api\" \"npm run dev --workspace @ai-sales-assistant/web\"",
+    "start": "npm run start --workspace @ai-sales-assistant/api",
     "build": "npm run build --workspace @ai-sales-assistant/api && npm run build --workspace @ai-sales-assistant/web",
     "typecheck": "npm run typecheck --workspace @ai-sales-assistant/api && npm run typecheck --workspace @ai-sales-assistant/web"
+  },
+  "engines": {
+    "node": ">=18.18.0"
   },
   "devDependencies": {
     "concurrently": "^9.0.0"
